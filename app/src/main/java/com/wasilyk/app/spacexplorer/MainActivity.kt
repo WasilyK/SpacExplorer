@@ -1,11 +1,18 @@
 package com.wasilyk.app.spacexplorer
 
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import com.wasilyk.app.spacexplorer.databinding.ActivityMainBinding
+import dagger.android.support.DaggerAppCompatActivity
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : DaggerAppCompatActivity() {
+
+    private lateinit var binding: ActivityMainBinding
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+
+
     }
 }
