@@ -12,12 +12,19 @@ import androidx.lifecycle.lifecycleScope
 import androidx.paging.CombinedLoadStates
 import androidx.paging.LoadState
 import androidx.recyclerview.widget.LinearLayoutManager
+import coil.load
 import com.google.android.material.snackbar.Snackbar
 import com.wasilyk.app.apod.databinding.FragmentApodBinding
+import com.wasilyk.app.apod.model.entitities.Apod
 import com.wasilyk.app.apod.viewmodel.ApodViewModel
 import com.wasilyk.app.apod.viewmodel.ApodViewModelFactory
+import com.wasilyk.app.core.Error
+import com.wasilyk.app.core.Loading
+import com.wasilyk.app.core.Success
 import dagger.android.support.DaggerFragment
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -25,10 +32,16 @@ class ApodFragment : DaggerFragment() {
 
     private var _binding: FragmentApodBinding? = null
     private val binding get() = _binding!!
+
     @Inject
     lateinit var apodViewModelFactory: ApodViewModelFactory
+
     @Inject
     lateinit var apodsAdapter: ApodsAdapter
+
+    private val viewModel: ApodViewModel by lazy {
+        ViewModelProvider(this, apodViewModelFactory).get(ApodViewModel::class.java)
+    }
 
     companion object {
         fun newInstance(): Fragment =
@@ -47,6 +60,7 @@ class ApodFragment : DaggerFragment() {
         super.onViewCreated(view, savedInstanceState)
         initApodsRecyclerView()
         subscribeApodsFlow()
+        subscribeApodFlow()
     }
 
     private fun initApodsRecyclerView() {
@@ -65,42 +79,81 @@ class ApodFragment : DaggerFragment() {
 
     private fun setApodsAdapterLoadStateListener() {
         apodsAdapter.addLoadStateListener { state: CombinedLoadStates ->
-            when(val refreshState = state.refresh) {
+            when (val refreshState = state.refresh) {
                 is LoadState.Loading -> {
-                    binding.apodsLoadingView.isVisible = true
-                    binding.apodsErrorView.isVisible = false
+                    binding.apply {
+                        apodsLoadingView.isVisible = true
+                        apodsErrorView.isVisible = false
+                        apodsRecyclerView.isVisible = false
+                    }
                 }
                 is LoadState.Error -> {
-                    binding.apodsLoadingView.isVisible = false
-                    binding.apodsErrorView.isVisible = true
-                    binding.apodsErrorTextView.text =
-                        refreshState.error.localizedMessage ?: "Unknown error"
-                    binding.retryButton.setOnClickListener { apodsAdapter.retry() }
+                    binding.apply {
+                        apodsLoadingView.isVisible = false
+                        apodsErrorView.isVisible = true
+                        apodsRecyclerView.isVisible = false
+                        apodsErrorTextView.text =
+                            refreshState.error.localizedMessage ?: "Unknown error"
+                        retryButton.setOnClickListener { apodsAdapter.retry() }
+                    }
                 }
                 is LoadState.NotLoading -> {
-                    binding.apodsLoadingView.isVisible = false
-                    binding.apodsErrorView.isVisible = false
+                    binding.apply {
+                        apodsLoadingView.isVisible = false
+                        apodsErrorView.isVisible = false
+                        apodsRecyclerView.isVisible = true
+                    }
                 }
             }
-            /*binding.apodsRecyclerView.isVisible = refreshState != LoadState.Loading
-            binding.apodsLoadStateView.isVisible = refreshState == LoadState.Loading
-            if (refreshState is LoadState.Error) {
-                Snackbar.make(
-                    binding.root,
-                    refreshState.error.localizedMessage ?: "Unknown error",
-                    Snackbar.LENGTH_INDEFINITE
-                ).show()
-            }*/
         }
     }
 
     private fun subscribeApodsFlow() {
-        val viewModel =
-            ViewModelProvider(this, apodViewModelFactory).get(ApodViewModel::class.java)
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.apodsFlow.collectLatest { pagingData ->
-                apodsAdapter.submitData(pagingData)
-            }
+            viewModel.apodsFlow
+                .collectLatest { pagingData ->
+                    apodsAdapter.submitData(pagingData)
+                }
+        }
+    }
+
+    private fun subscribeApodFlow() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.apodFlow
+                .collectLatest { appState ->
+                    when (appState) {
+                        is Loading -> {
+                            binding.apply {
+                                apodLoadingView.isVisible = true
+                                apodErrorView.isVisible = false
+                            }
+                        }
+                        is Success<*> -> {
+                            val apod = (appState as Success<List<Apod>>).data[0] as Apod
+                            binding.apply {
+                                apodLoadingView.isVisible = false
+                                apodErrorView.isVisible = false
+                                imageView.load(apod.url)
+                                titleView.text = apod.title
+                                dateView.text = apod.date
+                                explanationView.text = apod.explanation
+                                copyrightView.text = apod.copyright
+                            }
+
+                        }
+                        is Error -> {
+                            binding.apply {
+                                apodLoadingView.isVisible = false
+                                apodErrorView.isVisible = true
+                                apodsErrorTextView.text =
+                                    appState.throwable.localizedMessage
+                                        ?: "Unknown message"
+                                apodRetryButton.setOnClickListener {}
+                            }
+                        }
+                    }
+
+                }
         }
     }
 
