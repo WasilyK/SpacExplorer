@@ -6,6 +6,10 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.cachedIn
 import com.wasilyk.app.apod.model.repository.Repository
+import com.wasilyk.app.core.Loading
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.stateIn
 
 class ApodViewModel(
     private val repository: Repository
@@ -18,4 +22,9 @@ class ApodViewModel(
         repository
     }.flow
         .cachedIn(viewModelScope)
+
+    val apodFlow = flow {
+        emit(repository.fetchApod())
+    }
+        .stateIn(viewModelScope, SharingStarted.Lazily, Loading)
 }

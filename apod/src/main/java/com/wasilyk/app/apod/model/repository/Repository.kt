@@ -4,8 +4,11 @@ import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.wasilyk.app.apod.model.datasource.DataSource
 import com.wasilyk.app.apod.model.entitities.Apod
+import com.wasilyk.app.core.AppState
 import com.wasilyk.app.core.DATE_FORMAT
+import com.wasilyk.app.core.Error
 import com.wasilyk.app.core.NASA_API_KEY
+import com.wasilyk.app.core.Success
 import retrofit2.HttpException
 import java.text.SimpleDateFormat
 import java.util.*
@@ -19,6 +22,23 @@ class Repository @Inject constructor(
     companion object {
         const val NUMBER_APODS_IN_REQUEST = 6
     }
+
+    suspend fun fetchApod(): AppState =
+        try {
+            val response = dataSource.fetchApod(NASA_API_KEY)
+            if(response.isSuccessful) {
+                val body = response.body()
+                if(body != null) {
+                    Success(listOf(body))
+                } else {
+                    throw Throwable("Response body is null")
+                }
+            } else {
+                throw HttpException(response)
+            }
+        } catch (t: Throwable) {
+            Error(t)
+        }
 
     override fun getRefreshKey(state: PagingState<String, Apod>): String? =
         state.anchorPosition?.let { anchorPosition ->
