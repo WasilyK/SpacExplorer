@@ -8,3 +8,5 @@ dependencyResolutionManagement {
 }
 rootProject.name = "SpacExplorer"
 include ':app'
+include ':apod'
+include ':core'
